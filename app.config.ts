@@ -18,7 +18,10 @@ const config: ExpoConfig = {
   },
   extra: {
     supabaseUrl,
-    supabaseAnonKey
+    supabaseAnonKey,
+    eas: {
+      projectId: "3dfe495b-45f7-4d9a-84d2-58c1e0d318ca"
+    }
   }
 };
 
