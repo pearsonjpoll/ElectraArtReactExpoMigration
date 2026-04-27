@@ -3,13 +3,9 @@ import { supabase } from "../lib/supabase";
 import {
   EmployeeRequest,
   RequestDetail,
-  RequestImage,
-  RequestNote,
   RequestStatus,
   mapEmployeeRequest,
-  mapRequestDetail,
-  mapRequestImage,
-  mapRequestNote
+  mapRequestDetail
 } from "../models/requests";
 
 const assertClient = () => {
@@ -20,11 +16,28 @@ const assertClient = () => {
 };
 
 export class RequestsRepository {
+  async getCurrentUser() {
+    const client = assertClient();
+    return client.auth.getUser();
+  }
+
   async fetchRequests(status?: RequestStatus | null): Promise<EmployeeRequest[]> {
     const client = assertClient();
+    const {
+      data: { user }
+    } = await client.auth.getUser();
+
+    if (!user?.id) {
+      throw new Error("No signed-in user.");
+    }
+
     let query = client.from("requests").select(
-      "id, request_type, client_name, primary_contact_method, status, proposed_dates_json, created_at, assigned_to, notes"
+      "id, request_type, client_name, primary_contact_method, status, proposed_dates_json, created_at, assigned_to, preferred_staff_id, notes"
     );
+
+    // Show the shared intake queue plus anything already assigned to the
+    // signed-in employee.
+    query = query.or(`assigned_to.is.null,assigned_to.eq.${user.id}`);
 
     if (status) {
       query = query.eq("status", status);
@@ -41,44 +54,19 @@ export class RequestsRepository {
   async fetchRequestDetail(requestId: string): Promise<RequestDetail> {
     const client = assertClient();
 
-    const [requestResult, notesResult, imagesResult] = await Promise.all([
-      client
-        .from("requests")
-        .select(
-          "id, request_type, client_name, client_instagram, client_email, client_phone, primary_contact_method, secondary_contact_method, notes, tattoo_placement, tattoo_color_pref, tattoo_size_estimate, tattoo_description, piercing_placement, piercing_description, proposed_dates_json, status, assigned_to, created_at"
-        )
-        .eq("id", requestId)
-        .single(),
-      client
-        .from("request_notes")
-        .select("id, author_id, body, created_at")
-        .eq("request_id", requestId)
-        .order("created_at"),
-      client
-        .from("request_images")
-        .select("id, storage_bucket, storage_path, mime_type, size_bytes")
-        .eq("request_id", requestId)
-        .order("created_at")
-    ]);
+    const requestResult = await client
+      .from("requests")
+      .select(
+        "id, request_type, client_name, client_instagram, client_email, client_phone, primary_contact_method, secondary_contact_method, notes, tattoo_placement, tattoo_color_pref, tattoo_size_estimate, tattoo_description, piercing_placement, piercing_description, proposed_dates_json, status, assigned_to, preferred_staff_id, created_at"
+      )
+      .eq("id", requestId)
+      .single();
 
     if (requestResult.error) {
       throw requestResult.error;
     }
-    if (notesResult.error) {
-      throw notesResult.error;
-    }
-    if (imagesResult.error) {
-      throw imagesResult.error;
-    }
 
-    const notes: RequestNote[] = (notesResult.data ?? []).map((row) =>
-      mapRequestNote(row)
-    );
-    const images: RequestImage[] = (imagesResult.data ?? []).map((row) =>
-      mapRequestImage(row)
-    );
-
-    return mapRequestDetail(requestResult.data, notes, images);
+    return mapRequestDetail(requestResult.data);
   }
 
   async assignToCurrentUser(requestId: string): Promise<void> {

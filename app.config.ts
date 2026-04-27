@@ -9,9 +9,14 @@ const config: ExpoConfig = {
   version: "1.0.0",
   orientation: "portrait",
   userInterfaceStyle: "light",
+  icon: "./assets/icon.png",
   assetBundlePatterns: ["**/*"],
   android: {
-    package: "com.electra.employeeapp"
+    package: "com.electra.employeeapp",
+    adaptiveIcon: {
+      foregroundImage: "./assets/icon.png",
+      backgroundColor: "#000000"
+    }
   },
   ios: {
     bundleIdentifier: "com.electra.employeeapp"

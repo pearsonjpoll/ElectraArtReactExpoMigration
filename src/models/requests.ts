@@ -18,22 +18,8 @@ export type EmployeeRequest = {
   proposedDates: Date[];
   createdAt: Date;
   assignedTo: string | null;
+  preferredStaffId: string | null;
   notes: string | null;
-};
-
-export type RequestNote = {
-  id: string;
-  authorId: string;
-  body: string;
-  createdAt: Date;
-};
-
-export type RequestImage = {
-  id: string;
-  storageBucket: string;
-  storagePath: string;
-  mimeType: string | null;
-  sizeBytes: number | null;
 };
 
 export type RequestDetail = EmployeeRequest & {
@@ -47,8 +33,6 @@ export type RequestDetail = EmployeeRequest & {
   tattooDescription: string | null;
   piercingPlacement: string | null;
   piercingDescription: string | null;
-  requestNotes: RequestNote[];
-  requestImages: RequestImage[];
 };
 
 export const requestStatusLabel: Record<RequestStatus, string> = {
@@ -113,13 +97,12 @@ export const mapEmployeeRequest = (
   proposedDates: parseDates(row.proposed_dates_json),
   createdAt: parseDate(row.created_at),
   assignedTo: asOptionalString(row.assigned_to),
+  preferredStaffId: asOptionalString(row.preferred_staff_id),
   notes: asOptionalString(row.notes)
 });
 
 export const mapRequestDetail = (
-  row: Record<string, unknown>,
-  requestNotes: RequestNote[],
-  requestImages: RequestImage[]
+  row: Record<string, unknown>
 ): RequestDetail => ({
   ...mapEmployeeRequest(row),
   clientInstagram: asOptionalString(row.client_instagram),
@@ -133,31 +116,7 @@ export const mapRequestDetail = (
   tattooSizeEstimate: asOptionalString(row.tattoo_size_estimate),
   tattooDescription: asOptionalString(row.tattoo_description),
   piercingPlacement: asOptionalString(row.piercing_placement),
-  piercingDescription: asOptionalString(row.piercing_description),
-  requestNotes,
-  requestImages
-});
-
-export const mapRequestNote = (row: Record<string, unknown>): RequestNote => ({
-  id: String(row.id),
-  authorId: asOptionalString(row.author_id) ?? "",
-  body: asOptionalString(row.body) ?? "",
-  createdAt: parseDate(row.created_at)
-});
-
-export const mapRequestImage = (
-  row: Record<string, unknown>
-): RequestImage => ({
-  id: String(row.id),
-  storageBucket: asOptionalString(row.storage_bucket) ?? "",
-  storagePath: asOptionalString(row.storage_path) ?? "",
-  mimeType: asOptionalString(row.mime_type),
-  sizeBytes:
-    typeof row.size_bytes === "number"
-      ? row.size_bytes
-      : row.size_bytes == null
-        ? null
-        : Number(row.size_bytes)
+  piercingDescription: asOptionalString(row.piercing_description)
 });
 
 const asOptionalString = (value: unknown): string | null => {

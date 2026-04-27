@@ -8,8 +8,10 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
+  useWindowDimensions
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Card } from "../components/Card";
 import { PrimaryButton } from "../components/PrimaryButton";
@@ -29,7 +31,7 @@ type Props = NativeStackScreenProps<RootStackParamList, "Requests">;
 
 const repository = new RequestsRepository();
 const filterOptions: Array<{ label: string; value: RequestStatus | null }> = [
-  { label: "All active requests", value: null },
+  { label: "My queue + unassigned", value: null },
   { label: requestStatusLabel.new, value: "new" },
   { label: requestStatusLabel.reviewing, value: "reviewing" },
   { label: requestStatusLabel.contacted, value: "contacted" },
@@ -38,11 +40,14 @@ const filterOptions: Array<{ label: string; value: RequestStatus | null }> = [
 ];
 
 export function RequestsScreen({ navigation }: Props) {
+  const { width } = useWindowDimensions();
+  const isCompact = width < 420;
   const [requests, setRequests] = useState<EmployeeRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState<RequestStatus | null>(null);
   const [errorText, setErrorText] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const loadRequests = useCallback(
     async (isRefresh = false) => {
@@ -53,7 +58,11 @@ export function RequestsScreen({ navigation }: Props) {
           setLoading(true);
         }
 
+        const {
+          data: { user }
+        } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
         const result = await repository.fetchRequests(statusFilter);
+        setCurrentUserId(user?.id ?? null);
         setRequests(result);
         setErrorText(null);
       } catch (error) {
@@ -91,15 +100,17 @@ export function RequestsScreen({ navigation }: Props) {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View>
+    <SafeAreaView edges={["top"]} style={styles.container}>
+      <View style={[styles.header, isCompact && styles.headerCompact]}>
+        <View style={styles.headerCopy}>
           <Text style={styles.title}>Employee Requests</Text>
           <Text style={styles.subtitle}>
             Review intake records and update request state.
           </Text>
         </View>
-        <PrimaryButton label="Sign out" onPress={signOut} variant="outlined" />
+        <View style={[styles.signOutWrap, isCompact && styles.signOutWrapCompact]}>
+          <PrimaryButton label="Sign out" onPress={signOut} variant="outlined" />
+        </View>
       </View>
 
       <ScrollView
@@ -141,7 +152,9 @@ export function RequestsScreen({ navigation }: Props) {
           </View>
         ) : requests.length === 0 ? (
           <View style={styles.centerState}>
-            <Text style={styles.emptyText}>No requests match this filter right now.</Text>
+            <Text style={styles.emptyText}>
+              No requests in your queue match this filter right now.
+            </Text>
           </View>
         ) : (
           requests.map((request) => {
@@ -173,16 +186,24 @@ export function RequestsScreen({ navigation }: Props) {
                       {request.notes}
                     </Text>
                   ) : null}
-                  <Text style={styles.assignmentLabel}>
-                    {request.assignedTo ? "Assigned" : "Unassigned"}
-                  </Text>
+                  <View style={styles.metaFooter}>
+                    <Text style={styles.assignmentLabel}>
+                      {request.assignedTo ? "Assigned" : "Unassigned"}
+                    </Text>
+                    {request.preferredStaffId ? (
+                      <Text style={styles.preferredLabel}>
+                        Preferred staff:{" "}
+                        {request.preferredStaffId === currentUserId ? "You" : "Set"}
+                      </Text>
+                    ) : null}
+                  </View>
                 </Card>
               </TouchableOpacity>
             );
           })
         )}
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -194,21 +215,37 @@ const styles = StyleSheet.create({
     flex: 1
   },
   header: {
-    alignItems: "center",
+    alignItems: "flex-start",
     flexDirection: "row",
     justifyContent: "space-between",
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.md
+    paddingTop: spacing.sm
+  },
+  headerCompact: {
+    flexDirection: "column",
+    gap: spacing.md
+  },
+  headerCopy: {
+    flex: 1,
+    paddingRight: spacing.sm
+  },
+  signOutWrap: {
+    minWidth: 132
+  },
+  signOutWrapCompact: {
+    alignSelf: "stretch",
+    minWidth: 0
   },
   title: {
     color: colors.text,
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: "700"
   },
   subtitle: {
     color: colors.mutedText,
     fontSize: 14,
-    marginTop: 4
+    lineHeight: 20,
+    marginTop: 6
   },
   content: {
     gap: spacing.md,
@@ -291,5 +328,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
     marginTop: spacing.sm
+  },
+  metaFooter: {
+    gap: 4,
+    marginTop: spacing.sm
+  },
+  preferredLabel: {
+    color: colors.accent,
+    fontSize: 13,
+    fontWeight: "700"
   }
 });

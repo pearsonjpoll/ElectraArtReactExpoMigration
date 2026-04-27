@@ -29,6 +29,7 @@ export function RequestDetailScreen({ route }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const loadRequest = useCallback(
     async (isRefresh = false) => {
@@ -40,6 +41,10 @@ export function RequestDetailScreen({ route }: Props) {
         }
 
         const result = await repository.fetchRequestDetail(route.params.requestId);
+        const {
+          data: { user }
+        } = await repository.getCurrentUser();
+        setCurrentUserId(user?.id ?? null);
         setRequest(result);
         setErrorText(null);
       } catch (error) {
@@ -117,6 +122,14 @@ export function RequestDetailScreen({ route }: Props) {
         <Text style={styles.detailText}>
           Assigned: {request.assignedTo ? request.assignedTo : "No one yet"}
         </Text>
+        <Text style={styles.detailText}>
+          Preferred staff:{" "}
+          {request.preferredStaffId
+            ? request.preferredStaffId === currentUserId
+              ? "You"
+              : "Set"
+            : "No preference"}
+        </Text>
         {request.notes?.trim() ? <Text style={styles.notesText}>{request.notes}</Text> : null}
       </Card>
 
@@ -138,8 +151,8 @@ export function RequestDetailScreen({ route }: Props) {
         {request.proposedDates.length === 0 ? (
           <Text style={styles.detailText}>No proposed dates listed.</Text>
         ) : (
-          request.proposedDates.map((date) => (
-            <Text key={date.toISOString()} style={styles.detailText}>
+          request.proposedDates.map((date, index) => (
+            <Text key={`${date.toISOString()}-${index}`} style={styles.detailText}>
               {formatDateTime(date)}
             </Text>
           ))
@@ -159,31 +172,6 @@ export function RequestDetailScreen({ route }: Props) {
             <DetailLine label="Placement" value={request.piercingPlacement} />
             <DetailLine label="Description" value={request.piercingDescription} />
           </>
-        )}
-      </Section>
-
-      <Section title="Internal Notes">
-        {request.requestNotes.length === 0 ? (
-          <Text style={styles.detailText}>No internal notes yet.</Text>
-        ) : (
-          request.requestNotes.map((note) => (
-            <View key={note.id} style={styles.noteBlock}>
-              <Text style={styles.noteDate}>{formatDateTime(note.createdAt)}</Text>
-              <Text style={styles.detailText}>{note.body}</Text>
-            </View>
-          ))
-        )}
-      </Section>
-
-      <Section title="Reference Images">
-        {request.requestImages.length === 0 ? (
-          <Text style={styles.detailText}>No reference images listed.</Text>
-        ) : (
-          request.requestImages.map((image) => (
-            <Text key={image.id} style={styles.detailText}>
-              {image.storageBucket}/{image.storagePath}
-            </Text>
-          ))
         )}
       </Section>
 
@@ -324,14 +312,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     marginTop: spacing.sm
-  },
-  noteBlock: {
-    marginBottom: spacing.sm
-  },
-  noteDate: {
-    color: colors.mutedText,
-    fontSize: 13,
-    marginBottom: 4
   },
   actions: {
     gap: spacing.sm
